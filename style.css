@@ -1,0 +1,10 @@
+#frequency-toggle > li {
+    display: inline;
+    margin: 5px;
+    text-decoration: underline;
+}
+
+#frequencies > table, th, td {
+    border: 1px solid black;
+    border-collapse: collapse;
+}
