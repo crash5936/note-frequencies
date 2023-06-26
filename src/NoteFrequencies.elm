@@ -1,6 +1,5 @@
 module NoteFrequencies exposing (main)
 
-import Array
 import Array exposing (Array)
 import Browser
 import Debug exposing (toString)
@@ -8,6 +7,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
 import Round
+
 
 initialModel : Model
 initialModel =
@@ -28,43 +28,84 @@ frequencies : List Int
 frequencies =
     [ 436, 438, 440, 442, 444 ]
 
-octave : List String
-octave = 
+
+octaveNotes : List String
+octaveNotes =
     [ "A", "A♯", "B", "C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯" ]
+
+
+reverseOctaveNotes : List String
+reverseOctaveNotes =
+    [ "A", "G♯", "G", "F♯", "F", "E", "D♯", "D", "C♯", "C", "B", "A♯" ]
+
 
 subNumber : Int -> String
 subNumber number =
-    "0"
+    let
+        subNums = 
+            Array.fromList [ "₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉" ]
+        maybeSubNum =
+            Array.get number subNums
+        subNum =
+            case maybeSubNum of
+                Just num ->
+                    num
+                Nothing ->
+                    "₀₀₀"
+    in
+        subNum
+ 
 
 
 getNote : Int -> String
 getNote halfsteps =
     let
-        notes = 
-            if halfsteps < 0
-            then Array.fromList (List.reverse octave)
-            else Array.fromList octave
-        index = modBy 12 (abs halfsteps)
+        notes =
+            if halfsteps < 0 then
+                Array.fromList reverseOctaveNotes
+
+            else
+                Array.fromList octaveNotes
+
+        index =
+            modBy 12 (abs halfsteps)
+
         maybeNote =
             Array.get index notes
+
         note =
             case maybeNote of
                 Just noteStr ->
                     noteStr
+
                 Nothing ->
                     "err"
     in
-        note
+    note
+
+getOctave : Int -> Int
+getOctave halfsteps =
+    let
+        baseFreqOctave = 4
+        -- integer division by 12, ie. number of halfsteps in an octave
+        octaveDistance = halfsteps // 12 
+        octave = 4 + octaveDistance
+    in
+    octave
+    
+
+
+
 
 viewFrequencyToggle : Int -> Html Msg
 viewFrequencyToggle frequency =
     li [ onClick (ChangeBaseFrequency frequency) ] [ text (toString frequency) ]
 
 
-noteRow : String -> Float -> Html Msg
-noteRow note frequency =
+noteRow : String -> Int -> Float -> Html Msg
+noteRow note octave frequency =
     tr []
-        [ td [] [ text note ]
+        [ td [] [ text (note ++ subNumber octave) ]
         , td [] [ text (Round.round 2 frequency ++ " Hz") ]
         ]
 
@@ -72,41 +113,47 @@ noteRow note frequency =
 calculateFrequency : Int -> Int -> Float
 calculateFrequency baseFrequency halftones =
     let
-        constant = 2 ^ (1/12) -- the twelfth root of 2, because an octave has 12 half-steps and a tone doubles in frequency every octave in an equal tempered scale
+        -- the twelfth root of 2, because an octave has 12 half-steps and a tone doubles in frequency every octave in an equal tempered scale
+        constant =
+            2 ^ (1 / 12)
+
+        
     in
-    (toFloat baseFrequency * (constant ^ toFloat halftones))
+    toFloat baseFrequency * (constant ^ toFloat halftones)
 
 
 tones : Int -> Html Msg
 tones baseFrequency =
     let
+        lowerThanBaseOctaves =
+            List.range -47 -1
+                |> List.map getOctave
+
+        higherThanBaseOctaves =
+            List.range 1 47
+                |> List.map getOctave
+
         lowerThanBaseFreq =
             List.range -47 -1
-            |> List.map (calculateFrequency baseFrequency)
+                |> List.map (calculateFrequency baseFrequency)
 
         higherThanBaseFreq =
             List.range 1 47
-            |> List.map (calculateFrequency baseFrequency)
+                |> List.map (calculateFrequency baseFrequency)
 
         lowerThanBaseNotes =
             List.range -47 -1
-            |> List.map getNote
+                |> List.map getNote
 
         higherThanBaseNotes =
             List.range 1 47
-            |> List.map getNote
+                |> List.map getNote
 
         lowerThanBase =
-            List.map2 noteRow lowerThanBaseNotes lowerThanBaseFreq
+            List.map3 noteRow lowerThanBaseNotes lowerThanBaseOctaves lowerThanBaseFreq
 
         higherThanBase =
-            List.map2 noteRow higherThanBaseNotes higherThanBaseFreq
-
-        -- lowerThanBase =
-        --     List.map (noteRow "l") (List.range -47 -1)
-
-        -- higherThanBase =
-        --     List.map (noteRow "h") (List.range 1 47)
+            List.map3 noteRow higherThanBaseNotes higherThanBaseOctaves higherThanBaseFreq
     in
     table [ id "frequencies" ]
         ([ tr []
@@ -115,7 +162,7 @@ tones baseFrequency =
             ]
          ]
             ++ lowerThanBase
-            ++ [ noteRow "A₄" (toFloat baseFrequency) ]
+            ++ [ noteRow "A" 4 (toFloat baseFrequency) ]
             ++ higherThanBase
         )
 
